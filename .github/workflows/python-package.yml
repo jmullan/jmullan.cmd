@@ -36,6 +36,3 @@ jobs:
     - name: Test with pytest
       run: |
         pytest
-    - name: Demonstrate output
-      run: |
-        python tests/sample.py
