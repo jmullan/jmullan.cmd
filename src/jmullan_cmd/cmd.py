@@ -1,6 +1,7 @@
 """Command-line tooling helpers."""
 
 import abc
+import io
 import logging
 import os
 import sys
@@ -8,6 +9,9 @@ from argparse import ArgumentParser, Namespace
 from collections.abc import Callable
 from signal import SIG_DFL, signal, SIGPIPE
 from typing import TextIO
+import requests
+from jmullan_logging.helpers import logging_context
+from requests import Response
 
 logger = logging.getLogger(__name__)
 
@@ -46,20 +50,136 @@ def stop_on_broken_pipe_error():
     signal(SIGPIPE, handle_signal)
 
 
+
+class RequestsHandle:
+    def __init__(self, url: str):
+        logger.debug("Opening url")
+        self.url = url
+        self.response = requests.get(url, stream=True)
+        self._closed = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
+
+    """
+    Text I/O implementation using an in-memory buffer.
+
+    The initial_value argument sets the value of object.  The newline
+    argument is like the one of TextIOWrapper's constructor.
+    """
+    def close(self, *args, **kwargs): # real signature unknown
+        """
+        Close the IO object.
+
+        Attempting any further operation after the object is closed
+        will raise a ValueError.
+
+        This method has no effect if the file is already closed.
+        """
+        self._closed = True
+        try:
+            if self.response is not None:
+                self.response.close()
+                self.response = None
+        except Exception as ex:
+            with logging_context(external_http_url=self.url):
+                logger.exception("Error closing request")
+
+    def getvalue(self, *args, **kwargs) -> str: # real signature unknown
+        """ Retrieve the entire contents of the object. """
+        return self.response.text
+
+    def read(self, size: int | None = None) -> str: # real signature unknown
+        """
+        Read at most size characters, returned as a string.
+
+        If the argument is negative or omitted, read until EOF
+        is reached. Return an empty string at EOF.
+        """
+        if size is None:
+            try:
+                return self.response.text
+            finally:
+                self.close()
+        else:
+            # yield from self.response.iter_content(chunk_size=size, decode_unicode=True)
+            return self.response.iter_content(chunk_size=size, decode_unicode=True)
+        self.close()
+
+    def readable(self, *args, **kwargs): # real signature unknown
+        """ Returns True if the IO object can be read. """
+        return not self.closed
+
+    def readline(self, *args, **kwargs): # real signature unknown
+        """
+        Read until newline or EOF.
+
+        Returns an empty string if EOF is hit immediately.
+        """
+        yield from self.response.iter_lines(chunk_size=size, decode_unicode=True)
+        self.close()
+
+    def seek(self, *args, **kwargs): # real signature unknown
+        """
+        Change stream position.
+
+        Seek to character offset pos relative to position indicated by whence:
+            0  Start of stream (the default).  pos should be >= 0;
+            1  Current position - pos must be 0;
+            2  End of stream - pos must be 0.
+        Returns the new absolute position.
+        """
+        raise NotImplementedError("Cannot seek from requests")
+
+    def seekable(self, *args, **kwargs): # real signature unknown
+        """ Returns True if the IO object can be seeked. """
+        return False
+
+    def tell(self, *args, **kwargs): # real signature unknown
+        """ Tell the current file position. """
+        if not self.closed:
+            return self.response.raw.tell()
+
+    def truncate(self, *args, **kwargs): # real signature unknown
+        """
+        Truncate size to pos.
+
+        The pos argument defaults to the current file position, as
+        returned by tell().  The current file position is unchanged.
+        Returns the new absolute position.
+        """
+        raise NotImplementedError("Cannot seek from requests")
+
+    def writable(self, *args, **kwargs): # real signature unknown
+        """ Returns True if the IO object can be written. """
+        return False
+
+    def write(self, *args, **kwargs): # real signature unknown
+        """
+        Write string to file.
+
+        Returns the number of characters written, which is always equal to
+        the length of the string.
+        """
+        raise NotImplementedError("Cannot seek from requests")
+
+
 def open_file_or_stdin(filename: str) -> TextIO:
     if filename == "-":
         return sys.stdin
+    elif filename.startswith('https://') or filename.startswith("http://"):
+        return RequestsHandle(filename)
     else:
-        return open(filename)
+        return open(filename, 'rt')
 
 
 def read_file_or_stdin(filename: str) -> str:
-    if filename == "-":
-        return sys.stdin.read()
-    else:
-        file_size = os.path.getsize(filename)
-        with open(filename) as f:
-            return f.read(file_size)
+    with open_file_or_stdin(filename) as handle:
+        return handle.read()
 
 
 def write_to_file_or_stdout(filename: str, contents: str):
@@ -102,7 +222,6 @@ def update_and_print(filename: str, changer: Callable[[str], str]):
     new_contents = changer(contents)
     changed = new_contents != contents
     if changed:
-        logger.debug("printing file %s\n" % filename)
         print(new_contents)
 
 
@@ -125,11 +244,22 @@ class Main(abc.ABC):
             default=False,
             help="verbose is more verbose",
         )
+        self.parser.add_argument(
+            "-q",
+            "--quiet",
+            dest="quiet",
+            action="store_true",
+            default=False,
+            help="do not log anything",
+        )
         self.args = None
 
-    def main(self):
+    def setup(self):
         stop_on_broken_pipe_error()
         self.args = self.parser.parse_args()
+
+    def main(self):
+        self.setup()
 
 
 class FileNameProcessor(Main, abc.ABC):
@@ -141,8 +271,11 @@ class FileNameProcessor(Main, abc.ABC):
         """This allows overriding if needed"""
         return get_filenames(self.args)
 
-    def main(self):
+    def setup(self):
         add_filenames_arguments(self.parser)
+        super().setup()
+
+    def main(self):
         super().main()
         for filename in self.get_filenames():
             self.process_filename(filename)
@@ -170,7 +303,8 @@ class TextIoProcessor(FileNameProcessor, abc.ABC):
         pass
 
     def process_filename(self, filename: str):
-        self.process_file_handle(filename, open_file_or_stdin(filename))
+        with open_file_or_stdin(filename) as handle:
+            self.process_file_handle(filename, handle)
 
 
 class TextIoLineProcessor(TextIoProcessor, abc.ABC):
