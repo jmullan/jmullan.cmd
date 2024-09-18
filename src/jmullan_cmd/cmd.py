@@ -7,8 +7,10 @@ import os
 import sys
 from argparse import ArgumentParser, Namespace
 from collections.abc import Callable
-from signal import SIG_DFL, signal, SIGPIPE
+from fileinput import close
+from signal import SIG_DFL, SIGINT, signal, SIGPIPE
 from typing import TextIO
+
 import requests
 from jmullan_logging.helpers import logging_context
 from requests import Response
@@ -50,6 +52,9 @@ def stop_on_broken_pipe_error():
     signal(SIGPIPE, handle_signal)
 
 
+def handle_keyboard_interrupt():
+    signal(SIGINT, handle_signal)
+
 
 class RequestsHandle:
     def __init__(self, url: str):
@@ -71,7 +76,8 @@ class RequestsHandle:
     The initial_value argument sets the value of object.  The newline
     argument is like the one of TextIOWrapper's constructor.
     """
-    def close(self, *args, **kwargs): # real signature unknown
+
+    def close(self, *args, **kwargs):  # real signature unknown
         """
         Close the IO object.
 
@@ -89,11 +95,11 @@ class RequestsHandle:
             with logging_context(external_http_url=self.url):
                 logger.exception("Error closing request")
 
-    def getvalue(self, *args, **kwargs) -> str: # real signature unknown
-        """ Retrieve the entire contents of the object. """
+    def getvalue(self, *args, **kwargs) -> str:  # real signature unknown
+        """Retrieve the entire contents of the object."""
         return self.response.text
 
-    def read(self, size: int | None = None) -> str: # real signature unknown
+    def read(self, size: int | None = None) -> str:  # real signature unknown
         """
         Read at most size characters, returned as a string.
 
@@ -110,11 +116,11 @@ class RequestsHandle:
             return self.response.iter_content(chunk_size=size, decode_unicode=True)
         self.close()
 
-    def readable(self, *args, **kwargs): # real signature unknown
-        """ Returns True if the IO object can be read. """
+    def readable(self, *args, **kwargs):  # real signature unknown
+        """Returns True if the IO object can be read."""
         return not self.closed
 
-    def readline(self, *args, **kwargs): # real signature unknown
+    def readline(self, *args, **kwargs):  # real signature unknown
         """
         Read until newline or EOF.
 
@@ -123,7 +129,7 @@ class RequestsHandle:
         yield from self.response.iter_lines(chunk_size=size, decode_unicode=True)
         self.close()
 
-    def seek(self, *args, **kwargs): # real signature unknown
+    def seek(self, *args, **kwargs):  # real signature unknown
         """
         Change stream position.
 
@@ -135,16 +141,16 @@ class RequestsHandle:
         """
         raise NotImplementedError("Cannot seek from requests")
 
-    def seekable(self, *args, **kwargs): # real signature unknown
-        """ Returns True if the IO object can be seeked. """
+    def seekable(self, *args, **kwargs):  # real signature unknown
+        """Returns True if the IO object can be seeked."""
         return False
 
-    def tell(self, *args, **kwargs): # real signature unknown
-        """ Tell the current file position. """
+    def tell(self, *args, **kwargs):  # real signature unknown
+        """Tell the current file position."""
         if not self.closed:
             return self.response.raw.tell()
 
-    def truncate(self, *args, **kwargs): # real signature unknown
+    def truncate(self, *args, **kwargs):  # real signature unknown
         """
         Truncate size to pos.
 
@@ -154,11 +160,11 @@ class RequestsHandle:
         """
         raise NotImplementedError("Cannot seek from requests")
 
-    def writable(self, *args, **kwargs): # real signature unknown
-        """ Returns True if the IO object can be written. """
+    def writable(self, *args, **kwargs):  # real signature unknown
+        """Returns True if the IO object can be written."""
         return False
 
-    def write(self, *args, **kwargs): # real signature unknown
+    def write(self, *args, **kwargs):  # real signature unknown
         """
         Write string to file.
 
@@ -171,10 +177,10 @@ class RequestsHandle:
 def open_file_or_stdin(filename: str) -> TextIO:
     if filename == "-":
         return sys.stdin
-    elif filename.startswith('https://') or filename.startswith("http://"):
+    elif filename.startswith("https://") or filename.startswith("http://"):
         return RequestsHandle(filename)
     else:
-        return open(filename, 'rt')
+        return open(filename, "rt")
 
 
 def read_file_or_stdin(filename: str) -> str:
@@ -234,6 +240,7 @@ def get_module_docstring(module_name: str):
 class Main(abc.ABC):
     def __init__(self):
         description = self.__doc__ or get_module_docstring(self.__module__)
+        self.is_tty = sys.stdout.isatty()
 
         self.parser = ArgumentParser(description=description)
         self.parser.add_argument(
@@ -256,6 +263,7 @@ class Main(abc.ABC):
 
     def setup(self):
         stop_on_broken_pipe_error()
+        handle_keyboard_interrupt()
         self.args = self.parser.parse_args()
 
     def main(self):
