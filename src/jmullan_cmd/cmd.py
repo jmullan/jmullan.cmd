@@ -286,6 +286,8 @@ class FileNameProcessor(Main, abc.ABC):
     def main(self):
         super().main()
         for filename in self.get_filenames():
+            if not Jmullan.GO:
+                break
             self.process_filename(filename)
 
 
@@ -322,6 +324,8 @@ class TextIoLineProcessor(TextIoProcessor, abc.ABC):
 
     def process_file_handle(self, filename: str, file_handle: TextIO):
         for line in file_handle:
+            if not Jmullan.GO:
+                break
             should_print, line = self.process_line(filename, line)
             if should_print:
                 sys.stdout.write(line)
