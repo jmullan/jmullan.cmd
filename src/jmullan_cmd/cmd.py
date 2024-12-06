@@ -3,17 +3,14 @@
 import abc
 import io
 import logging
-import os
 import sys
 from argparse import ArgumentParser, Namespace
 from collections.abc import Callable
-from fileinput import close
 from signal import SIG_DFL, SIGINT, signal, SIGPIPE
 from typing import TextIO
 
 import requests
 from jmullan_logging.helpers import logging_context
-from requests import Response
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +21,7 @@ class Jmullan:
 
 
 def my_except_hook(exctype, value, traceback):
-    if exctype == BrokenPipeError:
+    if exctype is BrokenPipeError:
         Jmullan.PIPE_OK = False
         pass
     else:
@@ -91,7 +88,7 @@ class RequestsHandle:
             if self.response is not None:
                 self.response.close()
                 self.response = None
-        except Exception as ex:
+        except Exception:
             with logging_context(external_http_url=self.url):
                 logger.exception("Error closing request")
 
@@ -106,21 +103,23 @@ class RequestsHandle:
         If the argument is negative or omitted, read until EOF
         is reached. Return an empty string at EOF.
         """
-        if size is None:
-            try:
-                return self.response.text
-            finally:
-                self.close()
-        else:
-            # yield from self.response.iter_content(chunk_size=size, decode_unicode=True)
-            return self.response.iter_content(chunk_size=size, decode_unicode=True)
-        self.close()
+        try:
+            if size is None:
+                try:
+                    return self.response.text
+                finally:
+                    self.close()
+            else:
+                # yield from self.response.iter_content(chunk_size=size, decode_unicode=True)
+                return "".join(self.response.iter_content(chunk_size=size, decode_unicode=True))
+        finally:
+            self.close()
 
     def readable(self, *args, **kwargs):  # real signature unknown
         """Returns True if the IO object can be read."""
         return not self.closed
 
-    def readline(self, *args, **kwargs):  # real signature unknown
+    def readline(self, size=-1, /):  # real signature unknown
         """
         Read until newline or EOF.
 
@@ -178,9 +177,9 @@ def open_file_or_stdin(filename: str) -> TextIO:
     if filename == "-":
         return sys.stdin
     elif filename.startswith("https://") or filename.startswith("http://"):
-        return RequestsHandle(filename)
+        return RequestsHandle(filename)  # type: ignore[return-value]
     else:
-        return open(filename, "rt")
+        return open(filename)
 
 
 def read_file_or_stdin(filename: str) -> str:
@@ -219,7 +218,7 @@ def update_in_place(filename: str, changer: Callable[[str], str]):
     new_contents = changer(contents)
     changed = new_contents != contents
     if changed:
-        logger.debug("updated file %s\n" % filename)
+        logger.debug(f"updated file {filename}\n")
         write_to_file_or_stdout(filename, new_contents)
 
 
