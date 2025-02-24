@@ -1,7 +1,6 @@
 """Command-line tooling helpers."""
 
 import abc
-import io
 import logging
 import sys
 from argparse import ArgumentParser, Namespace
