@@ -1,6 +1,6 @@
+import abc
 import os
 from argparse import ArgumentParser
-from dataclasses import dataclass
 
 from typing_extensions import Protocol
 
@@ -15,6 +15,30 @@ class CanAddArgument(Protocol):
     """This covers the private argparse._ArgumentGroup"""
 
     def add_argument(self, *args, **kwargs): ...
+
+
+class ArgumentBuilder(abc.ABC):
+    default = None
+
+    def get(self) -> str | None:
+        raise NotImplementedError
+
+    def doc(self) -> str | None:
+        return None
+
+    def arg_name(self) -> str:
+        raise NotImplementedError
+
+    def field_name(self):
+        raise NotImplementedError
+
+    def add_to_parser(self, parser: ArgumentParser | CanAddArgument):
+        parser.add_argument(
+            self.arg_name(),
+            dest=self.field_name(),
+            default=self.default,
+            help=self.doc(),
+        )
 
 
 class FallbackToEnv:
@@ -52,14 +76,15 @@ class FallbackToEnv:
             case _:
                 return os.environ.get(self.variable, self.fallback)
 
-    def doc(self):
+    def doc(self) -> str | None:
         doc = self._doc
         match doc:
             case _MISSING():
                 doc = ""
             case None:
                 doc = ""
-        if not doc.endswith("."):
+        doc = doc.strip()
+        if len(doc) and not doc.endswith("."):
             doc = f"{doc}. "
         env = os.environ.get(self.variable, _MISSING())
         match env:
@@ -69,16 +94,14 @@ class FallbackToEnv:
                 variable = f"${self.variable}={env!r}"
         match self.fallback:
             case _MISSING():
-                return f"{doc}Defaults to {variable}"
+                pass
+            case _:
+                variable = f"{variable} or {self.fallback}"
+        return f"{doc}Defaults to {variable}"
 
-    def arg_name(self):
+    def arg_name(self) -> str:
         arg_name = self._field_name or self.variable
         return "--" + arg_name.replace("_", "-").lower()
 
-    def add_to_parser(self, parser: ArgumentParser | CanAddArgument):
-        parser.add_argument(
-            self.arg_name(),
-            dest=self._field_name,
-            default=self.default,
-            help=self.doc(),
-        )
+    def field_name(self) -> str:
+        return self.arg_name().removeprefix("--").replace("-", "_").lower()

@@ -1,9 +1,9 @@
 """Command-line tooling helpers."""
 
 import abc
+import argparse
 import logging
 import sys
-from argparse import ArgumentParser, Namespace
 from collections.abc import Callable
 from signal import SIG_DFL, SIGINT, signal, SIGPIPE
 from typing import TextIO
@@ -194,7 +194,7 @@ def write_to_file_or_stdout(filename: str, contents: str):
             f.write(contents)
 
 
-def add_filenames_arguments(parser: ArgumentParser):
+def add_filenames_arguments(parser: argparse.ArgumentParser):
     parser.add_argument(
         "filenames",
         nargs="*",
@@ -205,7 +205,7 @@ def add_filenames_arguments(parser: ArgumentParser):
     )
 
 
-def get_filenames(args: Namespace):
+def get_filenames(args: argparse.Namespace):
     filenames = args.filenames or []
     if not filenames:
         filenames.append("-")
@@ -241,7 +241,11 @@ class Main(abc.ABC):
 
         self.is_tty = sys.stdout.isatty()
 
-        self.parser = ArgumentParser(description=description)
+        self.parser = argparse.ArgumentParser(
+            formatter_class=self.get_argparse_formatter_class(),
+            description=description,
+            epilog=self.get_epilog()
+        )
         self.parser.add_argument(
             "-v",
             "--verbose",
@@ -259,6 +263,14 @@ class Main(abc.ABC):
             help="do not log anything",
         )
         self.args = None
+
+    def get_argparse_formatter_class(self) -> type(argparse.HelpFormatter):
+        """Override me if you need a different formatter"""
+        return argparse.RawDescriptionHelpFormatter
+
+    def get_epilog(self) -> str:
+        """Override me to add epilog items."""
+        return ""
 
     def setup(self):
         stop_on_broken_pipe_error()
