@@ -238,6 +238,7 @@ def get_module_docstring(module_name: str):
 class Main(abc.ABC):
     def __init__(self):
         description = self.__doc__ or get_module_docstring(self.__module__)
+
         self.is_tty = sys.stdout.isatty()
 
         self.parser = ArgumentParser(description=description)
