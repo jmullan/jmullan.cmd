@@ -18,7 +18,7 @@ class CanAddArgument(Protocol):
 
 
 class FallbackToEnv:
-    def __init__(self, variable: str, fallback: MaybeString = _MISSING(), doc: str | None = None):
+    def __init__(self, variable: str, fallback: MaybeString = _MISSING(), doc: MaybeString = _MISSING()):
         self.variable = variable
         self.fallback = fallback
         self._doc = doc
@@ -54,8 +54,13 @@ class FallbackToEnv:
 
     def doc(self):
         doc = self._doc
+        match doc:
+            case _MISSING():
+                doc = ""
+            case None:
+                doc = ""
         if not doc.endswith("."):
-            doc = f"{doc}."
+            doc = f"{doc}. "
         env = os.environ.get(self.variable, _MISSING())
         match env:
             case _MISSING():
@@ -64,7 +69,7 @@ class FallbackToEnv:
                 variable = f"${self.variable}={env!r}"
         match self.fallback:
             case _MISSING():
-                return f"{doc} Defaults to {variable}"
+                return f"{doc}Defaults to {variable}"
 
     def arg_name(self):
         arg_name = self._field_name or self.variable
