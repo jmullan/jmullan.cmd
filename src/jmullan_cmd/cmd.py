@@ -5,11 +5,12 @@ import argparse
 import logging
 import sys
 from collections.abc import Callable
-from signal import SIG_DFL, SIGINT, signal, SIGPIPE
+from signal import SIG_DFL, SIGINT, SIGPIPE, signal
 from typing import TextIO
 
 import requests
-from jmullan_logging.helpers import logging_context
+
+from jmullan_logging.helpers import logging_context  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ class RequestsHandle:
         """Retrieve the entire contents of the object."""
         return self.response.text
 
-    def read(self, size: int | None = None) -> str:  # real signature unknown
+    def read(self, size: int | None = None) -> str | None:  # real signature unknown
         """
         Read at most size characters, returned as a string.
 
@@ -104,10 +105,7 @@ class RequestsHandle:
         """
         try:
             if size is None:
-                try:
-                    return self.response.text
-                finally:
-                    self.close()
+                return self.response.text
             else:
                 # yield from self.response.iter_content(chunk_size=size, decode_unicode=True)
                 return "".join(self.response.iter_content(chunk_size=size, decode_unicode=True))
@@ -116,7 +114,7 @@ class RequestsHandle:
 
     def readable(self, *args, **kwargs):  # real signature unknown
         """Returns True if the IO object can be read."""
-        return not self.closed
+        return not self._closed
 
     def readline(self, size=-1, /):  # real signature unknown
         """
@@ -139,13 +137,14 @@ class RequestsHandle:
         """
         raise NotImplementedError("Cannot seek from requests")
 
-    def seekable(self, *args, **kwargs):  # real signature unknown
+    @staticmethod
+    def seekable(*args, **kwargs):  # real signature unknown
         """Returns True if the IO object can be seeked."""
         return False
 
     def tell(self, *args, **kwargs):  # real signature unknown
         """Tell the current file position."""
-        if not self.closed:
+        if self.readable():
             return self.response.raw.tell()
 
     def truncate(self, *args, **kwargs):  # real signature unknown
@@ -242,9 +241,7 @@ class Main(abc.ABC):
         self.is_tty = sys.stdout.isatty()
 
         self.parser = argparse.ArgumentParser(
-            formatter_class=self.get_argparse_formatter_class(),
-            description=description,
-            epilog=self.get_epilog()
+            formatter_class=self.get_argparse_formatter_class(), description=description, epilog=self.get_epilog()
         )
         self.parser.add_argument(
             "-v",
@@ -264,7 +261,7 @@ class Main(abc.ABC):
         )
         self.args = None
 
-    def get_argparse_formatter_class(self) -> type(argparse.HelpFormatter):
+    def get_argparse_formatter_class(self) -> type[argparse.HelpFormatter]:
         """Override me if you need a different formatter"""
         return argparse.RawDescriptionHelpFormatter
 

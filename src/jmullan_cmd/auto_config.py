@@ -46,7 +46,7 @@ class FallbackToDefault(ArgumentBuilder):
         self.value = _MISSING()  # type: MaybeString
 
     @property
-    def default(self) -> str | None:
+    def default(self) -> str | _MISSING | None:  # type: ignore[override]
         return self.fallback
 
     def doc(self) -> str | None:
@@ -82,7 +82,7 @@ class FallbackToEnv(ArgumentBuilder):
         self._field_name = None
 
     @property
-    def default(self) -> str | None:
+    def default(self) -> str | None:  # type: ignore[override]
         match self.fallback:
             case _MISSING():
                 return os.environ.get(self.variable)
