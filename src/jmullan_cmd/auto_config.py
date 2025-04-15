@@ -20,9 +20,6 @@ class CanAddArgument(Protocol):
 class ArgumentBuilder(abc.ABC):
     default = None
 
-    def get(self) -> str | None:
-        raise NotImplementedError
-
     def doc(self) -> str | None:
         return None
 
@@ -41,7 +38,41 @@ class ArgumentBuilder(abc.ABC):
         )
 
 
-class FallbackToEnv:
+class FallbackToDefault(ArgumentBuilder):
+    def __init__(self, field_name: str, fallback: MaybeString, doc: MaybeString = _MISSING()):
+        self._field_name = field_name
+        self.fallback = fallback
+        self._doc = doc
+        self.value = _MISSING()  # type: MaybeString
+
+    @property
+    def default(self) -> str | None:
+        return self.fallback
+
+    def doc(self) -> str | None:
+        doc = self._doc
+        match doc:
+            case _MISSING():
+                doc = ""
+            case None:
+                doc = ""
+        doc = doc.strip()
+        if len(doc) and not doc.endswith("."):
+            doc = f"{doc}. "
+        match self.fallback:
+            case _MISSING():
+                return doc.strip()
+            case _:
+                return f"{doc}Defaults to {self.fallback!r}"
+
+    def arg_name(self) -> str:
+        return "--" + self._field_name.replace("_", "-").lower()
+
+    def field_name(self) -> str:
+        return self.arg_name().removeprefix("--").replace("-", "_").lower()
+
+
+class FallbackToEnv(ArgumentBuilder):
     def __init__(self, variable: str, fallback: MaybeString = _MISSING(), doc: MaybeString = _MISSING()):
         self.variable = variable
         self.fallback = fallback
@@ -49,24 +80,6 @@ class FallbackToEnv:
         self.value = _MISSING()  # type: MaybeString
         self._owner_name = None
         self._field_name = None
-
-    def __set_name__(self, owner, name):
-        """Capture the class and field name where this was defined"""
-        self._owner_name = owner.__name__
-        self._field_name = name
-
-    def __set__(self, instance, value: str):
-        self.value = value
-
-    def __str__(self):
-        return self.get()
-
-    def get(self) -> str | None:
-        match self.value:
-            case _MISSING():
-                return self.default
-            case _:
-                return self.value
 
     @property
     def default(self) -> str | None:
@@ -97,7 +110,7 @@ class FallbackToEnv:
                 pass
             case _:
                 variable = f"{variable} or {self.fallback}"
-        return f"{doc}Defaults to {variable}"
+        return f"{doc}Defaults to {variable!r}"
 
     def arg_name(self) -> str:
         arg_name = self._field_name or self.variable
