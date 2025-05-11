@@ -5,11 +5,10 @@ import argparse
 import logging
 import sys
 from collections.abc import Callable
-from signal import SIG_DFL, SIGINT, SIGPIPE, signal
+import signal
 from typing import TextIO
 
 import requests
-
 from jmullan_logging.helpers import logging_context  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
@@ -20,6 +19,22 @@ class Jmullan:
     PIPE_OK = True
 
 
+def handle_signal(signum, frame):
+    if hasattr(signal, 'SIGPIPE') and signal.SIGPIPE == signum:
+        sys.stderr.close()
+        exit(128 + signum)
+
+    if not Jmullan.GO:
+        logger.debug("Received two signals, so immediately quitting")
+        exit(128 + signum)
+    Jmullan.GO = False
+
+
+
+def handle_keyboard_interrupt():
+    signal.signal(signal.SIGINT, handle_signal)
+
+
 def my_except_hook(exctype, value, traceback):
     if exctype is BrokenPipeError:
         Jmullan.PIPE_OK = False
@@ -28,29 +43,18 @@ def my_except_hook(exctype, value, traceback):
         sys.__excepthook__(exctype, value, traceback)
 
 
-def handle_signal(signum, frame):
-    logger.debug(f"Received signal {signum}")
-    if SIGPIPE == signum:
-        sys.stderr.close()
-        exit(1)
-    if not Jmullan.GO:
-        logger.debug("Received two signals, so immediately quitting")
-        exit(0)
-    Jmullan.GO = False
-
-
 def ignore_broken_pipe_error():
-    sys.excepthook = my_except_hook
-    signal(SIGPIPE, SIG_DFL)
+    if hasattr(signal, 'SIGPIPE'):
+        sys.excepthook = my_except_hook
+        signal.signal(SIGPIPE, SIG_DFL)
 
 
 def stop_on_broken_pipe_error():
-    sys.excepthook = my_except_hook
-    signal(SIGPIPE, handle_signal)
+    if hasattr(signal, 'SIGPIPE'):
+        sys.excepthook = my_except_hook
+        signal.signal(SIGPIPE, handle_signal)
 
 
-def handle_keyboard_interrupt():
-    signal(SIGINT, handle_signal)
 
 
 class RequestsHandle:
@@ -67,12 +71,6 @@ class RequestsHandle:
         self.close()
         return False
 
-    """
-    Text I/O implementation using an in-memory buffer.
-
-    The initial_value argument sets the value of object.  The newline
-    argument is like the one of TextIOWrapper's constructor.
-    """
 
     def close(self, *args, **kwargs):  # real signature unknown
         """
