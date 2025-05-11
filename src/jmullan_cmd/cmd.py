@@ -46,13 +46,13 @@ def my_except_hook(exctype, value, traceback):
 def ignore_broken_pipe_error():
     if hasattr(signal, 'SIGPIPE'):
         sys.excepthook = my_except_hook
-        signal.signal(SIGPIPE, SIG_DFL)
+        signal.signal(signal.SIGPIPE, SIG_DFL)
 
 
 def stop_on_broken_pipe_error():
     if hasattr(signal, 'SIGPIPE'):
         sys.excepthook = my_except_hook
-        signal.signal(SIGPIPE, handle_signal)
+        signal.signal(signal.SIGPIPE, handle_signal)
 
 
 
