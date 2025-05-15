@@ -26,7 +26,8 @@ dev = [
     "pip",
     "pre-commit",
     "pytest",
-    "ruff"
+    "ruff",
+    "uv"
 ]
 
 [project.urls]

@@ -3,12 +3,11 @@
 import abc
 import argparse
 import logging
+import signal
 import sys
 from collections.abc import Callable
-import signal
 from typing import TextIO
 
-import requests
 from jmullan_logging.helpers import logging_context  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,8 @@ class Jmullan:
 
 
 def handle_signal(signum, frame):
-    if hasattr(signal, 'SIGPIPE') and signal.SIGPIPE == signum:
+    if hasattr(signal, "SIGPIPE") and signal.SIGPIPE == signum:
+        Jmullan.PIPE_OK = False
         sys.stderr.close()
         exit(128 + signum)
 
@@ -30,12 +30,11 @@ def handle_signal(signum, frame):
     Jmullan.GO = False
 
 
-
 def handle_keyboard_interrupt():
     signal.signal(signal.SIGINT, handle_signal)
 
 
-def my_except_hook(exctype, value, traceback):
+def broken_pipe_except_hook(exctype, value, traceback):
     if exctype is BrokenPipeError:
         Jmullan.PIPE_OK = False
         pass
@@ -44,21 +43,23 @@ def my_except_hook(exctype, value, traceback):
 
 
 def ignore_broken_pipe_error():
-    if hasattr(signal, 'SIGPIPE'):
-        sys.excepthook = my_except_hook
-        signal.signal(signal.SIGPIPE, SIG_DFL)
+    if hasattr(signal, "SIGPIPE"):
+        sys.excepthook = broken_pipe_except_hook
+        # https://docs.python.org/3/library/signal.html#signal.signal
+        # SIG_DFL: take default action (raise a broken pipe error)
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 
 def stop_on_broken_pipe_error():
-    if hasattr(signal, 'SIGPIPE'):
-        sys.excepthook = my_except_hook
+    if hasattr(signal, "SIGPIPE"):
+        sys.excepthook = broken_pipe_except_hook
         signal.signal(signal.SIGPIPE, handle_signal)
-
-
 
 
 class RequestsHandle:
     def __init__(self, url: str):
+        import requests
+
         logger.debug("Opening url")
         self.url = url
         self.response = requests.get(url, stream=True)
@@ -70,7 +71,6 @@ class RequestsHandle:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
         return False
-
 
     def close(self, *args, **kwargs):  # real signature unknown
         """
@@ -226,10 +226,11 @@ def update_and_print(filename: str, changer: Callable[[str], str]):
         print(new_contents)
 
 
-def get_module_docstring(module_name: str):
+def get_module_docstring(module_name: str) -> str | None:
     module = sys.modules.get(module_name)
     if module is not None:
         return module.__doc__
+    return None
 
 
 class Main(abc.ABC):

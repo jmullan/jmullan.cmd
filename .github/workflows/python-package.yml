@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.13"]
 
     steps:
     - uses: actions/checkout@main
@@ -25,12 +25,11 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install '.[dev]'
+        python -m pip install --upgrade uv
+        uv pip install '.[dev]'
     - name: Lint
       run: |
-        ruff check
-        mypy src tests
+        pre-commit run --all-files
     - name: Test with pytest
       run: |
         pytest
