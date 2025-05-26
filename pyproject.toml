@@ -42,8 +42,12 @@ requires = [
 ]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/jmullan"]
+
 [tool.hatch.metadata]
 allow-direct-references = true
+allow-implicit-namespace-packages = true
 
 # Linter settings
 [tool.ruff]
