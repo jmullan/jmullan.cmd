@@ -60,7 +60,7 @@ known-local-folder = ["src"]
 section-order = ["future", "standard-library", "third-party", "internal", "first-party", "local-folder"]
 
 [tool.ruff.lint.isort.sections]
-internal = ["jmullan_logging"]
+internal = ["jmullan.logging"]
 
 [tool.ruff.format]
 docstring-code-format = true

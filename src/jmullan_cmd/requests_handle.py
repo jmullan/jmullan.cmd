@@ -2,7 +2,7 @@ import logging
 
 import requests
 
-from jmullan_logging.helpers import logging_context  # type: ignore[import-not-found]
+from jmullan.logging.helpers import logging_context  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
 
