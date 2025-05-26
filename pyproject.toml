@@ -17,7 +17,7 @@ requires-python = ">=3.11"
 keywords = ["cli"]
 dependencies = [
     'requests',
-    "jmullan_logging@git+https://github.com/jmullan/jmullan_logging"
+    "jmullan.logging@git+https://github.com/jmullan/jmullan.logging"
 ]
 
 [project.optional-dependencies]
