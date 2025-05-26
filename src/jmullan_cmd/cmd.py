@@ -55,7 +55,7 @@ def stop_on_broken_pipe_error():
 
 
 def open_via_requests(url: str) -> TextIO:
-    from jmullan_cmd import requests_handle
+    from jmullan.cmd import requests_handle
 
     return requests_handle.RequestsHandle(url)  # type: ignore[return-value]
 

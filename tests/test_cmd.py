@@ -1,4 +1,4 @@
-from jmullan_cmd import cmd
+from jmullan.cmd import cmd
 
 
 class MyMain(cmd.Main):

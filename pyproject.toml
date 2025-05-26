@@ -1,5 +1,5 @@
 [project]
-name = "jmullan_cmd"
+name = "jmullan.cmd"
 version = "1.0.0"
 description = "Easily write your python script"
 authors = [
@@ -31,9 +31,9 @@ dev = [
 ]
 
 [project.urls]
-homepage = "https://github.com/jmullan/jmullan_cmd"
-documentation = "https://github.com/jmullan/jmullan_cmd"
-repository = "https://github.com/jmullan/jmullan_cmd"
+homepage = "https://github.com/jmullan/jmullan.cmd"
+documentation = "https://github.com/jmullan/jmullan.cmd"
+repository = "https://github.com/jmullan/jmullan.cmd"
 
 
 [build-system]
