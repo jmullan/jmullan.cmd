@@ -49,6 +49,15 @@ packages = ["src/jmullan"]
 allow-direct-references = true
 allow-implicit-namespace-packages = true
 
+[tool.mypy]
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "src:tests"
+ignore_missing_imports = true
+enable_error_code = [
+    "ignore-without-code"
+]
+
 # Linter settings
 [tool.ruff]
 line-length = 120

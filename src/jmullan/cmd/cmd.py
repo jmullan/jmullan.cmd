@@ -3,6 +3,7 @@
 import abc
 import argparse
 import logging
+import os
 import signal
 import sys
 from collections.abc import Callable
@@ -124,6 +125,15 @@ def get_module_docstring(module_name: str) -> str | None:
     return None
 
 
+def env_hint(k: str, v: str | None, prefix: str = "") -> str:
+    if "password" in k.lower() or "token" in k.lower() and v is not None and len(v):
+        v = "*** REDACTED ***"
+    elif v is None:
+        v = "(not set)"
+
+    return f"{prefix}{k}={v}"
+
+
 def add_colors_argument(parser: argparse.ArgumentParser):
     """Add colors arguments with default and explanations.
     See: https://no-color.org/ and https://bixense.com/clicolors/
@@ -170,13 +180,8 @@ stdout:
   {is_tty_hint}
 
 Force the color setting:""".strip()
-    colors_group = parser.add_argument_group(
-        'Colors',
-        colors_help
-    )
-    colors = colors_group.add_mutually_exclusive_group(
-        required=False
-    )
+    colors_group = parser.add_argument_group("Colors", colors_help)
+    colors = colors_group.add_mutually_exclusive_group(required=False)
     colors.add_argument(
         "--colors",
         dest="colors",
