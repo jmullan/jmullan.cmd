@@ -3,11 +3,12 @@
 import abc
 import argparse
 import logging
-import os
 import signal
 import sys
 from collections.abc import Callable
 from typing import TextIO
+
+import jmullan.cmd.auto_config
 
 logger = logging.getLogger(__name__)
 
@@ -125,79 +126,6 @@ def get_module_docstring(module_name: str) -> str | None:
     return None
 
 
-def env_hint(k: str, v: str | None, prefix: str = "") -> str:
-    if "password" in k.lower() or "token" in k.lower() and v is not None and len(v):
-        v = "*** REDACTED ***"
-    elif v is None:
-        v = "(not set)"
-
-    return f"{prefix}{k}={v}"
-
-
-def add_colors_argument(parser: argparse.ArgumentParser):
-    """Add colors arguments with default and explanations.
-    See: https://no-color.org/ and https://bixense.com/clicolors/
-    """
-    no_color = os.environ.get("NO_COLOR")
-    cli_color = os.environ.get("CLICOLOR")
-    cli_color_force = os.environ.get("CLICOLOR_FORCE")
-    terminal = os.environ.get("TERM")
-    is_tty = sys.stdout.isatty()
-    term_hint = env_hint("TERM", terminal)
-    if no_color:
-        default_color = False
-    elif cli_color_force:
-        default_color = True
-    elif terminal == "xterm-mono" or terminal == "dumb":
-        default_color = False
-        term_hint = f"{term_hint}: this TERM disables colors by default"
-    elif cli_color:
-        default_color = is_tty
-    else:
-        default_color = is_tty
-
-    no_color_hint = env_hint("NO_COLOR", no_color)
-    cli_color_force_hint = env_hint("CLICOLOR_FORCE", cli_color_force)
-    cli_color_hint = env_hint("CLICOLOR", cli_color)
-
-    if is_tty:
-        is_tty_hint = "stdout is a tty"
-    else:
-        is_tty_hint = "stdout is not a tty"
-
-    if default_color:
-        default_color_hint = "Colors currently defaulting to on"
-    else:
-        default_color_hint = "Colors currently defaulting to off"
-
-    colors_help = f"""Should we use colored highlighting? ({default_color_hint})
-Environment variables:
-  {no_color_hint}: Set to 1 to disable colors by default
-  {cli_color_force_hint}: Set to 1 to enable colors by default
-  {cli_color_hint}: Set to 1 to enable colors if stdout is a tty
-  {term_hint}
-stdout:
-  {is_tty_hint}
-
-Force the color setting:""".strip()
-    colors_group = parser.add_argument_group("Colors", colors_help)
-    colors = colors_group.add_mutually_exclusive_group(required=False)
-    colors.add_argument(
-        "--colors",
-        dest="colors",
-        action="store_true",
-        default=default_color or None,
-        help="Force colors on",
-    )
-    colors.add_argument(
-        "--no-colors",
-        dest="colors",
-        action="store_false",
-        default=None,
-        help="Force colors off",
-    )
-
-
 class Main(abc.ABC):
     def __init__(self):
         description = self.__doc__ or get_module_docstring(self.__module__)
@@ -227,7 +155,7 @@ class Main(abc.ABC):
 
     def get_argparse_formatter_class(self) -> type[argparse.HelpFormatter]:
         """Override me if you need a different formatter"""
-        return argparse.RawDescriptionHelpFormatter
+        return jmullan.cmd.auto_config.AHelpFormatter
 
     def get_epilog(self) -> str:
         """Override me to add epilog items."""
