@@ -3,9 +3,7 @@ import argparse
 import os
 import sys
 from collections.abc import Iterable, Sized
-from typing import Any, TypeGuard
-
-from typing_extensions import Protocol
+from typing import Any, Protocol, TypeGuard
 
 
 class _MISSING: ...
