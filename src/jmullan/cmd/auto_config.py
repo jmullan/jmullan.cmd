@@ -1,3 +1,5 @@
+"""Work-in-progress tools to help set settings based on environment variables."""
+
 import abc
 import argparse
 import os
@@ -8,6 +10,8 @@ from typing import Any, Protocol, TypeGuard
 
 class _MISSING: ...
 
+
+MISSING = _MISSING()
 
 MaybeString = str | None | _MISSING
 
@@ -37,8 +41,7 @@ def get_terminal() -> str | None:
 def empty(value: Iterable | None) -> TypeGuard[str]:
     if isinstance(value, str):
         return value is None or len(value.strip()) == 0
-    else:
-        return value is None or not value
+    return value is None or not value
 
 
 def not_empty(value: Sized | None) -> TypeGuard[Sized]:
@@ -57,7 +60,7 @@ def env_fallbacks(var_names: list[str]) -> dict[str, str | None]:
 
 
 def env_hint(k: str, v: str | None, prefix: str = "") -> str:
-    if "password" in k.lower() or "token" in k.lower() and v is not None and len(v):
+    if "password" in k.lower() or ("token" in k.lower() and v is not None and len(v)):
         v = "*** REDACTED ***"
     elif v is None:
         v = "(not set)"
@@ -226,7 +229,7 @@ def add_boolean_argument(
         if k == default_source:
             default_source = env_hint(k, v, "set by $")
 
-    if len(environment_variable_helps):
+    if environment_variable_helps:
         help_texts.extend([f"  {e.strip()}" for e in environment_variable_helps])
     help_text = "\n".join(help_texts)
 
@@ -273,24 +276,34 @@ class AHelpFormatter(argparse.RawTextHelpFormatter):
 
 
 class CanAddArgument(Protocol):
-    """This covers the private argparse._ArgumentGroup"""
+    """Matches ArgumentParser and the private argparse._ArgumentGroup."""
 
-    def add_argument(self, *args, **kwargs): ...
+    def add_argument(self, *args, **kwargs) -> None:
+        """Add an argument to this parser."""
 
 
 class ArgumentBuilder(abc.ABC):
-    default = None
+    """Build your arguments via these helpful classes."""
 
     def doc(self) -> str | None:
+        """Return no documentation by default."""
         return None
 
+    @property
+    @abc.abstractmethod
+    def default(self) -> MaybeString:
+        """Return the default value for this argument."""
+
+    @abc.abstractmethod
     def arg_name(self) -> str:
-        raise NotImplementedError
+        """Return the name for the command line argument."""
 
-    def field_name(self):
-        raise NotImplementedError
+    @abc.abstractmethod
+    def field_name(self) -> str:
+        """Return the name for field as attached to argparse."""
 
-    def add_to_parser(self, parser: argparse.ArgumentParser | CanAddArgument):
+    def add_to_parser(self, parser: argparse.ArgumentParser | CanAddArgument) -> None:
+        """Attach this field to a parser or argument group."""
         parser.add_argument(
             self.arg_name(),
             dest=self.field_name(),
@@ -300,17 +313,21 @@ class ArgumentBuilder(abc.ABC):
 
 
 class FallbackToDefault(ArgumentBuilder):
-    def __init__(self, field_name: str, fallback: MaybeString, doc: MaybeString = _MISSING()):
+    """Set up an argument with a default to use."""
+
+    def __init__(self, field_name: str, fallback: MaybeString, doc: MaybeString = MISSING):
         self._field_name = field_name
         self.fallback = fallback
         self._doc = doc
-        self.value = _MISSING()  # type: MaybeString
+        self.value = MISSING  # type: MaybeString
 
     @property
-    def default(self) -> str | _MISSING | None:  # type: ignore[override]
+    def default(self) -> MaybeString:
+        """Return the default value for the argument."""
         return self.fallback
 
     def doc(self) -> str | None:
+        """Generate best-guess documentation for the argument."""
         doc = self._doc
         match doc:
             case _MISSING():
@@ -327,23 +344,28 @@ class FallbackToDefault(ArgumentBuilder):
                 return f"{doc}Defaults to {self.fallback!r}"
 
     def arg_name(self) -> str:
+        """Turn the field name into an argument name."""
         return "--" + self._field_name.replace("_", "-").lower()
 
     def field_name(self) -> str:
+        """Turn the field name into an argument name and then back into a field name."""
         return self.arg_name().removeprefix("--").replace("-", "_").lower()
 
 
 class FallbackToEnv(ArgumentBuilder):
-    def __init__(self, variable: str, fallback: MaybeString = _MISSING(), doc: MaybeString = _MISSING()):
+    """Look in the environment for a value for an argument."""
+
+    def __init__(self, variable: str, fallback: MaybeString = MISSING, doc: MaybeString = MISSING):
         self.variable = variable
         self.fallback = fallback
         self._doc = doc
-        self.value = _MISSING()  # type: MaybeString
+        self.value = MISSING  # type: MaybeString
         self._owner_name = None
         self._field_name = None
 
     @property
-    def default(self) -> str | None:  # type: ignore[override]
+    def default(self) -> str | None:
+        """Try to get the value for the argument."""
         match self.fallback:
             case _MISSING():
                 return get_environ(self.variable)
@@ -351,6 +373,7 @@ class FallbackToEnv(ArgumentBuilder):
                 return get_environ(self.variable, self.fallback)
 
     def doc(self) -> str | None:
+        """Generate best-guess documentation for the argument."""
         doc = self._doc
         match doc:
             case _MISSING():
@@ -374,8 +397,10 @@ class FallbackToEnv(ArgumentBuilder):
         return f"{doc}Defaults to {variable!r}"
 
     def arg_name(self) -> str:
+        """Get the argument name."""
         arg_name = self._field_name or self.variable
         return "--" + arg_name.replace("_", "-").lower()
 
     def field_name(self) -> str:
+        """Get the field name."""
         return self.arg_name().removeprefix("--").replace("-", "_").lower()

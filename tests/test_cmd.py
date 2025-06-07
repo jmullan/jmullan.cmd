@@ -2,7 +2,8 @@ from jmullan.cmd import cmd
 
 
 class MyMain(cmd.Main):
-    pass
+    def main(self) -> None:
+        super().setup()
 
 
 def test_main():

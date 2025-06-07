@@ -30,7 +30,7 @@ def pretend_stdout_is_not_a_tty():
 
 def test_get_environ(environment: dict):
     environment["foo"] = "bar"
-    assert "bar" == auto_config.get_environ("foo")
+    assert auto_config.get_environ("foo") == "bar"
     assert auto_config.get_environ("qqq") is None
 
 
