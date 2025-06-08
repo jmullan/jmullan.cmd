@@ -1,9 +1,12 @@
 import logging
-from jmullan.cmd import auto_config
-from jmullan.cmd import cmd
+from sys import stdout
+
 from jmullan.logging.easy_logging import easy_initialize_logging
 
+from jmullan.cmd import auto_config, cmd
+
 logger = logging.getLogger(__name__)
+
 
 class DemoMain(cmd.Main):
     def __init__(self):
@@ -13,7 +16,7 @@ class DemoMain(cmd.Main):
             """Enable hyperspace for fast travel.""",
             "hyperspace",
             ["HYPERSPACE", "HYPERSPACE_ENABLED"],
-            False
+            False,
         )
 
     def setup(self) -> None:
@@ -29,9 +32,11 @@ class DemoMain(cmd.Main):
         super().main()
         logger.debug("Starting the demo")
         if self.args.hyperspace:
-            print("Hyperspace is enabled!")
+            stdout.write("Hyperspace is enabled!\n")
         else:
-            print("Hyperspace is disabled!")
+            stdout.write("Hyperspace is disabled!\n")
+        stdout.write("Thank you\n")
+
 
 if __name__ == "__main__":
     demo = DemoMain()
