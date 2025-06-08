@@ -28,6 +28,14 @@ def pretend_stdout_is_not_a_tty():
         yield mock_stdout_is_a_tty
 
 
+def test_not_empty_string():
+    assert auto_config.not_empty_string("Not empty")
+    assert not auto_config.not_empty_string("")
+    assert not auto_config.not_empty_string(None)
+    assert not auto_config.not_empty_string(auto_config.MISSING)
+    assert not auto_config.not_empty_string("  ")
+
+
 def test_get_environ(environment: dict):
     environment["foo"] = "bar"
     assert auto_config.get_environ("foo") == "bar"
@@ -58,7 +66,7 @@ def test_a_help_formatter_colors(environment, pretend_stdout_is_not_a_tty):
     parser = argparse.ArgumentParser(
         prog="program", formatter_class=auto_config.AHelpFormatter, description="This is a parser"
     )
-    auto_config.add_colors_argument(parser)
+    auto_config.add_color_arguments(parser)
     expected = """usage: program [-h] [--colors | --no-colors]
 
 This is a parser
@@ -84,7 +92,7 @@ def test_a_help_formatter_colors_2(environment, pretend_stdout_is_a_tty):
     parser = argparse.ArgumentParser(
         prog="program", formatter_class=auto_config.AHelpFormatter, description="This is a parser"
     )
-    auto_config.add_colors_argument(parser)
+    auto_config.add_color_arguments(parser)
     expected = """usage: program [-h] [--colors | --no-colors]
 
 This is a parser
