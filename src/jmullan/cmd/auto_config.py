@@ -4,7 +4,6 @@ import abc
 import argparse
 import os
 import sys
-from collections.abc import Iterable, Sized
 from typing import Protocol, TypeGuard
 
 
@@ -48,18 +47,6 @@ def stdout_supports_unicode() -> bool:
 def get_terminal() -> MaybeString:
     """Get the value of the TERM environment variable."""
     return get_environ("TERM")
-
-
-def empty(value: Iterable | None) -> TypeGuard[str]:
-    """Check if a value is a string and if it is empty."""
-    if isinstance(value, str):
-        return value is None or len(value.strip()) == 0
-    return value is None or not value
-
-
-def not_empty(value: Sized | None) -> TypeGuard[Sized]:
-    """Verify that a value is not None and is truthy."""
-    return value is not None and isinstance(value, Sized) and len(value) > 0
 
 
 def not_empty_string(value: MaybeString) -> TypeGuard[str]:
@@ -228,7 +215,7 @@ def add_boolean_argument(
     default_source = None
     default = None
     for k, v in fallbacks.items():
-        if v is not None:
+        if not_empty_string(v):
             default_source = k
             default = guess_boolean(v)
             break
@@ -250,7 +237,7 @@ def add_boolean_argument(
 
     for k, v in fallbacks.items():
         hint = env_hint(k, v, "$")
-        if v is not None and has_found_default is False:
+        if not_empty_string(v) and has_found_default is False:
             if default:
                 hint = f"{true_mark} {hint}"
             else:
@@ -417,15 +404,13 @@ class FallbackToEnv(ArgumentBuilder):
     def doc(self) -> str | None:
         """Generate best-guess documentation for the argument."""
         doc = self._doc
-        match doc:
-            case _MISSING():
-                doc = ""
-            case None:
-                doc = ""
-        doc = doc.strip()
+        if not_empty_string(doc):
+            doc = doc.strip()
+        else:
+            doc = ""
         if len(doc) and not doc.endswith("."):
             doc = f"{doc}. "
-        env = get_environ(self.variable, _MISSING())
+        env = get_environ(self.variable)
         match env:
             case _MISSING():
                 variable = f"${self.variable} (unset)"
