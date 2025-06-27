@@ -59,9 +59,6 @@ extra-dependencies = [
   "mypy>=1.0.0",
 ]
 
-[tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/jmullan/chat tests}"
-
 [tool.hatch.metadata]
 allow-direct-references = true
 allow-implicit-namespace-packages = true
