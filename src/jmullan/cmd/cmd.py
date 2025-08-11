@@ -7,6 +7,7 @@ import pathlib
 import signal
 import sys
 from collections.abc import Callable
+from importlib import metadata
 from types import FrameType, TracebackType
 from typing import TextIO
 
@@ -178,16 +179,59 @@ def find_command_help(command: object) -> str | None:
     clazz = getattr(command, "__class__", object)
     if bool(getattr(clazz, "__abstractmethods__", None)):
         return None
-
     docs = [
         find_method_help(getattr(command, "main", object)),
         find_method_help(getattr(command, "__init__", object)),
         command.__doc__,
         get_module_docstring(command.__module__),
     ]
+    command_name = get_package_name(command)
+    version = get_version(command)
+    if command_name is not None and version is not None:
+        command_name_and_version = f"{command_name} {version}"
+    elif command_name is not None:
+        command_name_and_version = command_name
+    else:
+        command_name_and_version = f"Version {version}"
     for doc in docs:
         if doc is not None and len(doc.strip()) and not doc.startswith("#"):
+            if command_name_and_version is not None and command_name_and_version not in doc:
+                return f"{command_name_and_version}:\n{doc}"
             return doc
+    return None
+
+
+def get_package_name(command: object) -> str | None:
+    """Get the name of the package that the command is defined in."""
+    if command is None:
+        return None
+
+    module_parts = command.__module__.split(".")
+    while len(module_parts):
+        module = ".".join(module_parts)
+        try:
+            package_metadata = metadata.metadata(module)
+            names: list[str] | None = package_metadata.get_all("Name")
+            if names is not None:
+                return names[0]
+        except metadata.PackageNotFoundError:
+            # throw away the last part
+            module_parts.pop()
+    return None
+
+
+def get_version(command: object) -> str | None:
+    """Find the version of the command's package, if possible."""
+    if command is None:
+        return None
+    module_parts = command.__module__.split(".")
+    while len(module_parts):
+        module = ".".join(module_parts)
+        try:
+            return metadata.version(module)
+        except metadata.PackageNotFoundError:
+            # throw away the last part
+            module_parts.pop()
     return None
 
 
