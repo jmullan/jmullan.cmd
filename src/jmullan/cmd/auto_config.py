@@ -16,6 +16,7 @@ MISSING = _MISSING()
 
 MaybeString = str | None | _MISSING
 
+CENSORED_WORDS = ["password", "passphrase", "token", "secret"]
 
 # Mockable methods for interacting with the standard library.
 
@@ -62,11 +63,29 @@ def env_fallbacks(var_names: list[str]) -> dict[str, MaybeString]:
     return fallbacks
 
 
+def contains_any(
+    whole_string: str,
+    fragments: list[str],
+    case_sensitive: bool | None = True,  # noqa: FBT001 FBT002
+) -> bool:
+    """Check if any of the given strings are substrings of the first."""
+    if whole_string is None or not fragments:
+        return False
+    if case_sensitive:
+        clean_fragments = [f for f in fragments if f is not None and len(f)]
+    else:
+        clean_fragments = [f.lower() for f in fragments if f is not None and len(f)]
+        whole_string = whole_string.lower()
+    if not clean_fragments:
+        return False
+    return any(fragment in whole_string for fragment in clean_fragments)
+
+
 def env_hint(k: str, v: MaybeString, prefix: str = "") -> str:
     """Make a hint for a value that can be derived from an environment variable."""
     if v is None or isinstance(v, _MISSING):
         v = "(not set)"
-    elif "password" in k.lower() or ("token" in k.lower() and len(v)):
+    elif contains_any(k, CENSORED_WORDS, case_sensitive=False) and v:
         v = "*** REDACTED ***"
 
     return f"{prefix}{k}={v}"
@@ -206,7 +225,11 @@ def guess_boolean(value: MaybeString) -> bool:
 
 
 def add_boolean_argument(
-    parser: argparse.ArgumentParser, argument_help: str | None, name: str, var_names: list[str], fallback: bool | None
+    parser: argparse.ArgumentParser,
+    argument_help: str | None,
+    name: str,
+    var_names: list[str],
+    fallback: bool | None,  # noqa: FBT001
 ) -> None:
     """Add two arguments, --thing and --no-thing, and optionally select a default."""
     help_texts = []
@@ -269,7 +292,11 @@ def add_boolean_argument(
     )
 
 
-def build_boolean_options_hint(name: str, default: bool | None, default_source: str | None) -> str:
+def build_boolean_options_hint(
+    name: str,
+    default: bool | None,  # noqa: FBT001
+    default_source: str | None,
+) -> str:
     """Build the hints for turning the option on and off."""
     if default:
         return f"[--{name} ({default_source}) | --no-{name}]"
@@ -408,7 +435,7 @@ class FallbackToEnv(ArgumentBuilder):
             doc = doc.strip()
         else:
             doc = ""
-        if len(doc) and not doc.endswith("."):
+        if doc and not doc.endswith("."):
             doc = f"{doc}. "
         env = get_environ(self.variable)
         match env:

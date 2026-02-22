@@ -3,7 +3,7 @@
 import logging
 from collections.abc import Generator
 from types import TracebackType
-from typing import Literal
+from typing import Literal, Self
 
 import requests
 
@@ -26,7 +26,7 @@ class RequestsHandle:
         self.response = requests.get(url, stream=True, timeout=timeout)
         self._closed = False
 
-    def __enter__(self) -> "RequestsHandle":
+    def __enter__(self) -> Self:
         """Provide this object as a context manager."""
         return self
 

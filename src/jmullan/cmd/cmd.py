@@ -81,7 +81,7 @@ def stop_on_broken_pipe_error() -> bool:
 
 def open_via_requests(url: str) -> TextIO:
     """Open a url as though it were a file."""
-    from jmullan.cmd import requests_handle
+    from jmullan.cmd import requests_handle  # noqa: PLC0415
 
     return requests_handle.RequestsHandle(url)  # type: ignore[return-value]
 
