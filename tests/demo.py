@@ -18,6 +18,29 @@ class DemoMain(cmd.Main):
             ["HYPERSPACE", "HYPERSPACE_ENABLED"],
             False,
         )
+        auto_config.add_exclusive_group_with_default(
+            self.parser,
+            required=True,
+            dest="select",
+            options=[
+                auto_config.GroupOption(
+                    "--all",
+                    value="all",
+                    help="Select all the things",
+                    is_default=True
+                ),
+                auto_config.GroupOption(
+                    "--first",
+                    value="first",
+                    help="Select just the first thing"
+                ),
+                auto_config.GroupOption(
+                    "--last",
+                    value="last",
+                    help="Select just the last thing"
+                ),
+            ]
+        )
 
     def setup(self) -> None:
         super().setup()
@@ -35,6 +58,7 @@ class DemoMain(cmd.Main):
             stdout.write("Hyperspace is enabled!\n")
         else:
             stdout.write("Hyperspace is disabled!\n")
+        stdout.write(f"Selected: {self.args.select}")
         stdout.write("Thank you\n")
 
 

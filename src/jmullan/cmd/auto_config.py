@@ -4,8 +4,9 @@ import abc
 import argparse
 import os
 import sys
-from typing import Protocol, TypeGuard
+from typing import Protocol, TypeGuard, Generic, TypeVar
 
+T = TypeVar("T")
 
 class _MISSING:
     def __bool__(self):
@@ -315,6 +316,46 @@ def build_boolean_title(name: str, argument_help: str | None) -> str:
     else:
         title = name.replace("-", " ").replace("_", " ").title()
     return title
+
+
+class GroupOption(Generic[T]):
+    def __init__(self, /, flag: str, value: T, help: str | None, is_default: bool | None = False):
+        self.flag = flag
+        self.value = value
+        self.help = help
+        self.is_default = is_default
+
+
+def add_exclusive_group_with_default(
+    parser: argparse.ArgumentParser,
+    required: bool,
+    dest: str,
+    options: list[GroupOption]
+
+):
+    group = parser.add_mutually_exclusive_group(required=required)
+    default_option: str | None = None
+    for option in options:
+        if option.is_default:
+            default_option = option.flag
+            group.add_argument(
+                option.flag,
+                action="store_const",
+                dest=dest,
+                const=option.value,
+                default=option.value,
+                help=option.help
+            )
+            break
+    for option in options:
+        if option.flag != default_option:
+            group.add_argument(
+                option.flag,
+                action="store_const",
+                dest=dest,
+                const=option.value,
+                help=option.help
+            )
 
 
 class AHelpFormatter(argparse.RawTextHelpFormatter):
