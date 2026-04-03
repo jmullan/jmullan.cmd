@@ -2,14 +2,16 @@
 
 import abc
 import argparse
+import functools
+import importlib
 import logging
+import multiprocessing
 import pathlib
 import signal
 import sys
-from collections.abc import Callable
+import typing
 from importlib import metadata
 from types import FrameType, TracebackType
-from typing import TextIO
 
 import jmullan.cmd.auto_config
 
@@ -21,6 +23,54 @@ class Jmullan:
 
     GO = True
     PIPE_OK = True
+
+
+P = typing.ParamSpec("P")
+R = typing.TypeVar("R")
+
+
+def run_with_queue(
+    q: multiprocessing.Queue,
+    module_name: str,
+    func_name: str,
+    args: tuple[typing.Any, ...],
+    kwargs: dict[str,typing.Any],
+) -> None:
+    try:
+        mod = importlib.import_module(module_name)
+        fn = getattr(mod, func_name)
+        fn = getattr(fn, "__wrapped__", fn)
+        q.put(("ok", fn(*args, **kwargs)))
+    except BaseException as e:
+        q.put(("err", (type(e), str(e))))
+
+
+def forked(timeout: int | None = None) -> typing.Callable[..., R]:
+    def decorator(function: typing.Callable[P, R]) -> typing.Callable[P, R]:
+        @functools.wraps(function)
+        def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
+            queue: multiprocessing.Queue = multiprocessing.Queue()
+            p = multiprocessing.Process(
+                target=run_with_queue,
+                args=(queue, function.__module__, function.__name__, args, kwargs)
+            )
+            p.start()
+            p.join(timeout)
+            if p.is_alive():
+                p.terminate()
+                p.join()
+                raise TimeoutError(f"{function.__name__} timed out after {timeout} seconds")
+
+            if queue.empty():
+                raise RuntimeError(f"{function.__name__} exited without returning a result")
+
+            status, payload = queue.get()
+            if status == "err":
+                exc_type, msg = payload
+                raise exc_type(msg)
+            return payload
+        return wrapped
+    return decorator
 
 
 def handle_signal(signum: int, _: FrameType | None) -> None:
@@ -79,14 +129,14 @@ def stop_on_broken_pipe_error() -> bool:
     return False
 
 
-def open_via_requests(url: str) -> TextIO:
+def open_via_requests(url: str) -> typing.TextIO:
     """Open a url as though it were a file."""
     from jmullan.cmd import requests_handle  # noqa: PLC0415
 
     return requests_handle.RequestsHandle(url)  # type: ignore[return-value]
 
 
-def open_file_or_stdin(filename: str) -> TextIO:
+def open_file_or_stdin(filename: str) -> typing.TextIO:
     """Open a file, use stdin, or make an http request."""
     if filename == "-":
         return sys.stdin
@@ -135,7 +185,7 @@ def get_filenames(args: argparse.Namespace) -> list[str]:
     return filenames
 
 
-def update_in_place(filename: str, changer: Callable[[str], str]) -> None:
+def update_in_place(filename: str, changer: typing.Callable[[str], str]) -> None:
     """Load a file, transform its contents, and write them back into the file."""
     contents = read_file_or_stdin(filename)
     new_contents = changer(contents)
@@ -145,7 +195,7 @@ def update_in_place(filename: str, changer: Callable[[str], str]) -> None:
         write_to_file_or_stdout(filename, new_contents)
 
 
-def update_and_print(filename: str, changer: Callable[[str], str]) -> None:
+def update_and_print(filename: str, changer: typing.Callable[[str], str]) -> None:
     """Load a file, transform its contents, and print them out."""
     contents = read_file_or_stdin(filename)
     new_contents = changer(contents)
@@ -163,7 +213,7 @@ def get_module_docstring(module_name: str) -> str | None:
     return None
 
 
-def find_method_help(method: Callable | None) -> str | None:
+def find_method_help(method:typing.Callable | None) -> str | None:
     """Check a method's docstring to see if it can be used for a help message."""
     if method is None:
         return None
@@ -361,10 +411,10 @@ class PrintingFileProcessor(ContentsProcessor, abc.ABC):
 
 
 class TextIoProcessor(FileNameProcessor, abc.ABC):
-    """A file processor for reading and processing the entire contents at once.."""
+    """A file processor for reading and processing the entire contents at once."""
 
     @abc.abstractmethod
-    def process_file_handle(self, filename: str, file_handle: TextIO) -> None:
+    def process_file_handle(self, filename: str, file_handle: typing.TextIO) -> None:
         """Process a file handle.
 
         This is for you to implement.
@@ -386,7 +436,7 @@ class TextIoLineProcessor(TextIoProcessor, abc.ABC):
         This is for you to implement.
         """
 
-    def process_file_handle(self, filename: str, file_handle: TextIO) -> None:
+    def process_file_handle(self, filename: str, file_handle: typing.TextIO) -> None:
         """Process a file handle line by line."""
         for line in file_handle:
             if not Jmullan.GO:
