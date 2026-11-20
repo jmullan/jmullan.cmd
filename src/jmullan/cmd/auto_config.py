@@ -4,9 +4,10 @@ import abc
 import argparse
 import os
 import sys
-from typing import Protocol, TypeGuard, Generic, TypeVar
+from typing import Generic, Protocol, TypeGuard, TypeVar
 
 T = TypeVar("T")
+
 
 class _MISSING:
     def __bool__(self):
@@ -18,6 +19,7 @@ MISSING = _MISSING()
 MaybeString = str | None | _MISSING
 
 CENSORED_WORDS = ["password", "passphrase", "token", "secret"]
+
 
 # Mockable methods for interacting with the standard library.
 
@@ -274,22 +276,18 @@ def add_boolean_argument(
             default_source = env_hint(k, v, "set by $")
 
     if environment_variable_helps:
-        help_texts.extend([f"  {e.strip()}" for e in environment_variable_helps])
+        help_texts.extend([f"{e.strip()}" for e in environment_variable_helps])
     help_text = "\n".join(help_texts)
-
-    names = build_boolean_options_hint(name, default, default_source)
 
     title = build_boolean_title(name, argument_help)
 
-    title = f"  {names} {title}"
-    group = parser.add_argument_group(title, help_text)
-    exclusive = group.add_mutually_exclusive_group(required=False)
-
-    exclusive.add_argument(
-        f"--{name}", dest=dest, required=False, action="store_true", default=default or None, help=argparse.SUPPRESS
-    )
-    exclusive.add_argument(
-        f"--no-{name}", dest=dest, required=False, action="store_false", default=default, help=argparse.SUPPRESS
+    group = parser.add_argument_group(title)
+    group.add_argument(
+        f"--{name}",
+        dest=dest,
+        action=argparse.BooleanOptionalAction,
+        default=default,
+        help=f"{help_text}",
     )
 
 
@@ -319,7 +317,17 @@ def build_boolean_title(name: str, argument_help: str | None) -> str:
 
 
 class GroupOption(Generic[T]):
-    def __init__(self, /, flag: str, value: T, help: str | None, is_default: bool | None = False):
+    """An option for an argument group."""
+
+    def __init__(
+        self,
+        /,
+        flag: str,
+        *,
+        value: T,
+        help: str | None,  # noqa: A002
+        is_default: bool | None = False,
+    ):
         self.flag = flag
         self.value = value
         self.help = help
@@ -327,34 +335,25 @@ class GroupOption(Generic[T]):
 
 
 def add_exclusive_group_with_default(
-    parser: argparse.ArgumentParser,
-    required: bool,
-    dest: str,
-    options: list[GroupOption]
-
-):
-    group = parser.add_mutually_exclusive_group(required=required)
+    parser: argparse.ArgumentParser, dest: str, options: list[GroupOption], *, required: bool, title: str | None = None
+) -> None:
+    """Add a group to a parser, but mark one as the default."""
+    if title is None:
+        title = dest.title()
+    group = parser.add_argument_group(title=title)
+    exclusive_group = group.add_mutually_exclusive_group(required=required)
     default_option: str | None = None
     for option in options:
         if option.is_default:
             default_option = option.flag
-            group.add_argument(
-                option.flag,
-                action="store_const",
-                dest=dest,
-                const=option.value,
-                default=option.value,
-                help=option.help
+            exclusive_group.add_argument(
+                option.flag, action="store_const", dest=dest, const=option.value, default=option.value, help=option.help
             )
             break
     for option in options:
         if option.flag != default_option:
-            group.add_argument(
-                option.flag,
-                action="store_const",
-                dest=dest,
-                const=option.value,
-                help=option.help
+            exclusive_group.add_argument(
+                option.flag, action="store_const", dest=dest, const=option.value, help=option.help
             )
 
 

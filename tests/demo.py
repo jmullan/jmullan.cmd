@@ -13,33 +13,20 @@ class DemoMain(cmd.Main):
         cmd.Main.__init__(self)
         auto_config.add_boolean_argument(
             self.parser,
-            """Enable hyperspace for fast travel.""",
+            "Enable hyperspace for fast travel",
             "hyperspace",
             ["HYPERSPACE", "HYPERSPACE_ENABLED"],
             False,
         )
         auto_config.add_exclusive_group_with_default(
             self.parser,
-            required=True,
             dest="select",
             options=[
-                auto_config.GroupOption(
-                    "--all",
-                    value="all",
-                    help="Select all the things",
-                    is_default=True
-                ),
-                auto_config.GroupOption(
-                    "--first",
-                    value="first",
-                    help="Select just the first thing"
-                ),
-                auto_config.GroupOption(
-                    "--last",
-                    value="last",
-                    help="Select just the last thing"
-                ),
-            ]
+                auto_config.GroupOption("--all", value="all", help="Select all the things", is_default=True),
+                auto_config.GroupOption("--first", value="first", help="Select just the first thing"),
+                auto_config.GroupOption("--last", value="last", help="Select just the last thing"),
+            ],
+            required=True,
         )
 
     def setup(self) -> None:
@@ -58,7 +45,7 @@ class DemoMain(cmd.Main):
             stdout.write("Hyperspace is enabled!\n")
         else:
             stdout.write("Hyperspace is disabled!\n")
-        stdout.write(f"Selected: {self.args.select}")
+        stdout.write(f"Selected: {self.args.select}\n")
         stdout.write("Thank you\n")
 
 

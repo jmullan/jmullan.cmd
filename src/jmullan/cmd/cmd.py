@@ -34,42 +34,61 @@ def run_with_queue(
     module_name: str,
     func_name: str,
     args: tuple[typing.Any, ...],
-    kwargs: dict[str,typing.Any],
+    kwargs: dict[str, typing.Any],
 ) -> None:
+    """Run a named function, reading from and writing to a queue."""
     try:
         mod = importlib.import_module(module_name)
         fn = getattr(mod, func_name)
         fn = getattr(fn, "__wrapped__", fn)
-        q.put(("ok", fn(*args, **kwargs)))
+
+        if callable(fn):
+            q.put(("ok", fn(*args, **kwargs)))
+        else:
+            message = f"{module_name}.{func_name} is not callable: {type(fn)}"
+            e = TypeError(message)
+            q.put(("err", (type(e), str(e))))
     except BaseException as e:
         q.put(("err", (type(e), str(e))))
 
 
-def forked(timeout: int | None = None) -> typing.Callable[..., R]:
+def forked(
+    timeout: int | None = None,
+) -> typing.Callable[
+    [typing.Callable[P, R]],
+    typing.Callable[P, R],
+]:
+    """Set up a function to be called in a new process using a queue and a given timeout."""
+
     def decorator(function: typing.Callable[P, R]) -> typing.Callable[P, R]:
+        """Set up a function to be called in a new process using a queue and a given timeout."""
+
         @functools.wraps(function)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
             queue: multiprocessing.Queue = multiprocessing.Queue()
             p = multiprocessing.Process(
-                target=run_with_queue,
-                args=(queue, function.__module__, function.__name__, args, kwargs)
+                target=run_with_queue, args=(queue, function.__module__, function.__name__, args, kwargs)
             )
             p.start()
             p.join(timeout)
             if p.is_alive():
                 p.terminate()
                 p.join()
-                raise TimeoutError(f"{function.__name__} timed out after {timeout} seconds")
+                message = f"{function.__name__} timed out after {timeout} seconds"
+                raise TimeoutError(message)
 
             if queue.empty():
-                raise RuntimeError(f"{function.__name__} exited without returning a result")
+                message = f"{function.__name__} exited without returning a result"
+                raise RuntimeError(message)
 
             status, payload = queue.get()
             if status == "err":
                 exc_type, msg = payload
                 raise exc_type(msg)
-            return payload
+            return payload  # type: ignore[no-any-return]
+
         return wrapped
+
     return decorator
 
 
@@ -213,7 +232,7 @@ def get_module_docstring(module_name: str) -> str | None:
     return None
 
 
-def find_method_help(method:typing.Callable | None) -> str | None:
+def find_method_help(method: typing.Callable | None) -> str | None:
     """Check a method's docstring to see if it can be used for a help message."""
     if method is None:
         return None
@@ -307,7 +326,8 @@ class Main(abc.ABC):
             description=description,
             epilog=self.get_epilog(),
         )
-        self.parser.add_argument(
+        verbosity = self.parser.add_mutually_exclusive_group(required=False)
+        verbosity.add_argument(
             "-v",
             "--verbose",
             dest="verbose",
@@ -315,7 +335,7 @@ class Main(abc.ABC):
             default=False,
             help="verbose is more verbose",
         )
-        self.parser.add_argument(
+        verbosity.add_argument(
             "-q",
             "--quiet",
             dest="quiet",

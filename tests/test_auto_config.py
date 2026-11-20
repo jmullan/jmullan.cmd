@@ -122,16 +122,16 @@ def test_a_help_formatter_boolean_1(environment: dict):
         epilog="This is an epilog",
     )
     auto_config.add_boolean_argument(parser, "Do a thing", "foo-bar", ["FOOBAR", "FOO_BAR"], True)
-    expected = """usage: program [-h]
+    expected = """usage: program [-h] [--foo-bar | --no-foo-bar]
 
 This is a parser
 
 options:
-  -h, --help  show this help message and exit
+  -h, --help               show this help message and exit
 
-  [--foo-bar (default) | --no-foo-bar] Do a thing:
-    · $FOOBAR=(not set)
-    · $FOO_BAR=(not set)
+Do a thing:
+  --foo-bar, --no-foo-bar  · $FOOBAR=(not set)
+                           · $FOO_BAR=(not set)
 
 This is an epilog
 """
@@ -142,14 +142,14 @@ This is an epilog
 def test_a_help_formatter_boolean_2(environment: dict):
     parser = argparse.ArgumentParser(prog="program", formatter_class=auto_config.AHelpFormatter)
     auto_config.add_boolean_argument(parser, "Do a thing", "foo-bar", ["FOOBAR", "FOO_BAR"], False)
-    expected = """usage: program [-h]
+    expected = """usage: program [-h] [--foo-bar | --no-foo-bar]
 
 options:
-  -h, --help  show this help message and exit
+  -h, --help               show this help message and exit
 
-  [--foo-bar | --no-foo-bar (default)] Do a thing:
-    · $FOOBAR=(not set)
-    · $FOO_BAR=(not set)
+Do a thing:
+  --foo-bar, --no-foo-bar  · $FOOBAR=(not set)
+                           · $FOO_BAR=(not set)
 """
     help_text = parser.format_help()
     assert help_text == expected
@@ -160,14 +160,14 @@ def test_a_help_formatter_boolean_3(environment: dict):
 
     parser = argparse.ArgumentParser(prog="program", formatter_class=auto_config.AHelpFormatter)
     auto_config.add_boolean_argument(parser, "Do a thing", "foo-bar", ["FOOBAR", "FOO_BAR"], False)
-    expected = """usage: program [-h]
+    expected = """usage: program [-h] [--foo-bar | --no-foo-bar]
 
 options:
-  -h, --help  show this help message and exit
+  -h, --help               show this help message and exit
 
-  [--foo-bar (set by $FOOBAR=true) | --no-foo-bar] Do a thing:
-    ✓ $FOOBAR=true
-    · $FOO_BAR=(not set)
+Do a thing:
+  --foo-bar, --no-foo-bar  ✓ $FOOBAR=true
+                           · $FOO_BAR=(not set)
 """
     help_text = parser.format_help()
     assert help_text == expected
@@ -178,14 +178,14 @@ def test_a_help_formatter_boolean_4(environment: dict):
 
     parser = argparse.ArgumentParser(prog="program", formatter_class=auto_config.AHelpFormatter)
     auto_config.add_boolean_argument(parser, "Do a thing", "foo-bar", ["FOOBAR", "FOO_BAR"], False)
-    expected = """usage: program [-h]
+    expected = """usage: program [-h] [--foo-bar | --no-foo-bar]
 
 options:
-  -h, --help  show this help message and exit
+  -h, --help               show this help message and exit
 
-  [--foo-bar | --no-foo-bar (set by $FOOBAR=false)] Do a thing:
-    ✗ $FOOBAR=false
-    · $FOO_BAR=(not set)
+Do a thing:
+  --foo-bar, --no-foo-bar  ✗ $FOOBAR=false
+                           · $FOO_BAR=(not set)
 """
     help_text = parser.format_help()
     assert help_text == expected
